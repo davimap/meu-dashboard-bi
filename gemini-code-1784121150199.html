@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Athena BI - Dynamic Analytics Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* Custom scrollbar para visual premium */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .dark ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-50 min-h-screen font-sans transition-colors duration-300">
+
+    <nav class="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 sticky top-0 z-50 transition-colors">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center gap-3">
+                    <div class="p-2.5 bg-gradient-to-br from-brand-500 to-brand-700 text-white rounded-xl shadow-md shadow-brand-500/20">
+                        <i class="fa-solid fa-chart-pie text-xl"></i>
+                    </div>
+                    <div>
+                        <span class="text-lg font-bold tracking-tight bg-gradient-to-r from-brand-500 to-sky-400 bg-clip-text text-transparent">ATHENA BI</span>
+                        <span class="text-[10px] block font-mono text-slate-400 -mt-1">DYNAMIC INSIGHTS</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4">
+                    <button id="themeToggle" class="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-all">
+                        <i id="themeIcon" class="fa-solid fa-moon"></i>
+                    </button>
+                    <div id="fileStatusBadge" class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-500">
+                        <span class="h-2 w-2 rounded-full bg-amber-500 animate-pulse"></span>
+                        Aguardando Base de Dados
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <section id="uploadSection" class="mb-8">
+            <div id="dropzone" class="border-2 border-dashed border-slate-300 dark:border-slate-800 hover:border-brand-500 dark:hover:border-brand-500 rounded-2xl bg-white dark:bg-slate-900 p-8 text-center cursor-pointer transition-all duration-300 shadow-sm hover:shadow-lg">
+                <input type="file" id="fileInput" class="hidden" accept=".xlsx, .xls, .csv">
+                <div class="max-w-md mx-auto py-4">
+                    <div class="w-16 h-16 bg-brand-50 dark:bg-brand-950/50 rounded-2xl flex items-center justify-center mx-auto mb-4 text-brand-500">
+                        <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
+                    </div>
+                    <h3 class="text-lg font-semibold mb-1">Carregue seus dados</h3>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mb-4">Arraste seu arquivo Excel (.xlsx, .xls) ou CSV aqui, ou clique para explorar.</p>
+                    <button class="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white font-medium rounded-xl text-sm transition-all shadow-md shadow-brand-500/10">
+                        Selecionar Arquivo
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <div id="loadingIndicator" class="hidden py-20 text-center">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-slate-300 dark:border-slate-800 border-t-brand-500 mb-4"></div>
+            <p class="text-slate-500 dark:text-slate-400">Processando e modelando seus dados...</p>
+        </div>
+
+        <div id="dashboardWorkspace" class="hidden space-y-8">
+            
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                <div>
+                    <h2 id="loadedFileName" class="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                        <i class="fa-solid fa-file-excel text-emerald-500"></i> NomeDoArquivo.xlsx
+                    </h2>
+                    <p id="loadedFileMeta" class="text-xs text-slate-400">0 linhas e 0 colunas detectadas</p>
+                </div>
+                <div class="flex gap-2 w-full sm:w-auto">
+                    <button onclick="exportToExcel()" class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium transition-all">
+                        <i class="fa-solid fa-file-excel"></i> Exportar XLSX
+                    </button>
+                    <button onclick="exportToPDF()" class="flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-medium transition-all">
+                        <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+                    </button>
+                </div>
+            </div>
+
+            <section id="kpiGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+                </section>
+
+            <section class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
+                <div class="flex items-center justify-between mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <h3 class="font-bold flex items-center gap-2 text-slate-800 dark:text-slate-200">
+                        <i class="fa-solid fa-sliders text-brand-500"></i> Painel de Filtros e Busca
+                    </h3>
+                    <button onclick="clearAllFilters()" class="text-xs text-slate-400 hover:text-brand-500 transition-colors">
+                        Limpar todos os filtros
+                    </button>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="relative md:col-span-1">
+                        <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Busca Rápida</label>
+                        <div class="relative">
+                            <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                                <i class="fa-solid fa-magnifying-glass text-xs"></i>
+                            </span>
+                            <input type="text" id="globalSearch" placeholder="Escreva para buscar..." class="w-full pl-9 pr-4 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm focus:outline-none focus:border-brand-500 dark:focus:border-brand-500 transition-all">
+                        </div>
+                    </div>
+                    <div id="dynamicFiltersContainer" class="grid grid-cols-1 md:grid-cols-3 md:col-span-3 gap-4">
+                        </div>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="lg:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 id="chartPrimaryTitle" class="font-bold text-slate-800 dark:text-slate-200">Análise de Tendência Temporal</h3>
+                            <p class="text-xs text-slate-400">Agrupamento dinâmico baseado na linha do tempo</p>
+                        </div>
+                        <div class="flex gap-1.5 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                            <button onclick="changePrimaryChartType('line')" class="px-2.5 py-1 text-xs font-medium rounded-md bg-white dark:bg-slate-900 shadow-sm">Linha</button>
+                            <button onclick="changePrimaryChartType('bar')" class="px-2.5 py-1 text-xs font-medium rounded-md text-slate-500 hover:text-slate-800 dark:hover:text-slate-200">Barra</button>
+                        </div>
+                    </div>
+                    <div class="h-80 relative">
+                        <canvas id="primaryChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                    <div class="mb-6">
+                        <h3 id="chartSecondaryTitle" class="font-bold text-slate-800 dark:text-slate-200">Ranking Categórico</h3>
+                        <p class="text-xs text-slate-400">Distribuição proporcional por categoria</p>
+                    </div>
+                    <div class="h-80 relative flex items-center justify-center">
+                        <canvas id="secondaryChart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section id="insightsBox" class="bg-gradient-to-r from-brand-900 to-indigo-950 text-white rounded-2xl p-6 shadow-xl border border-brand-800/30">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="p-2 bg-brand-500/20 text-brand-400 rounded-lg">
+                        <i class="fa-solid fa-wand-magic-sparkles text-lg animate-pulse"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base">Mecanismo de IA e Insights de Negócios</h3>
+                        <p class="text-[11px] text-brand-300">Análise algorítmica de comportamentos de dados</p>
+                    </div>
+                </div>
+                <div id="insightContent" class="text-sm leading-relaxed text-slate-200 space-y-2">
+                    </div>
+            </section>
+
+            <section class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <div class="p-6 border-b border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                        <h3 class="font-bold text-slate-800 dark:text-slate-200">Tabela de Dados Analítica</h3>
+                        <p class="text-xs text-slate-400">Visualização tabular interativa com suporte a paginação e busca</p>
+                    </div>
+                    <div class="text-xs text-slate-400 font-mono" id="tablePaginationMeta">
+                        Mostrando 0-0 de 0 registros
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse text-sm" id="pivotTable">
+                        <thead class="bg-slate-50 dark:bg-slate-950 border-b border-slate-100 dark:border-slate-800">
+                            <tr id="tableHeaderRow">
+                                </tr>
+                        </thead>
+                        <tbody id="tableBody" class="divide-y divide-slate-100 dark:divide-slate-800">
+                            </tbody>
+                    </table>
+                </div>
+
+                <div class="p-4 border-t border-slate-100 dark:border-slate-800 flex justify-between items-center gap-4">
+                    <button id="btnPrevPage" onclick="prevPage()" class="px-4 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:pointer-events-none">
+                        Anterior
+                    </button>
+                    <div id="pageSelector" class="flex gap-1">
+                        </div>
+                    <button id="btnNextPage" onclick="nextPage()" class="px-4 py-2 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-850 rounded-xl text-xs font-semibold transition-all disabled:opacity-40 disabled:pointer-events-none">
+                        Próxima
+                    </button>
+                </div>
+            </section>
+
+        </div>
+    </main>
+
+    <footer class="mt-20 border-t border-slate-200 dark:border-slate-900 py-8 text-center text-xs text-slate-400">
+        <p>Athena BI Engine — Construído com Tailwind, Chart.js & SheetJS.</p>
+    </footer>
+
+    <script>
+        // State Management
+        let rawData = [];
+        let filteredData = [];
+        let schema = {
+            numeric: [],
+            dates: [],
+            categories: []
+        };
+        let activeFilters = {};
+        let activePrimaryChart = null;
+        let activeSecondaryChart = null;
+        let primaryChartType = 'line';
+        let pagination = {
+            currentPage: 1,
+            pageSize: 10
+        };
+
+        // Theme controller (Light/Dark Mode)
+        const themeToggle = document.getElementById('themeToggle');
+        const themeIcon = document.getElementById('themeIcon');
+        const htmlElement = document.documentElement;
+
+        themeToggle.addEventListener('click', () => {
+            if (htmlElement.classList.contains('dark')) {
+                htmlElement.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                themeIcon.className = 'fa-solid fa-sun';
+            } else {
+                htmlElement.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                themeIcon.className = 'fa-solid fa-moon';
+            }
+            if (rawData.length > 0) {
+                renderCharts(); // Atualiza as cores do gráfico
+            }
+        });
+
+        // Initialize user preferences
+        if (localStorage.getItem('theme') === 'light') {
+            htmlElement.classList.remove('dark');
+            themeIcon.className = 'fa-solid fa-sun';
+        } else {
+            htmlElement.classList.add('dark');
+            themeIcon.className = 'fa-solid fa-moon';
+        }
+
+        // Dropzone & File Reader handlers
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropzone.addEventListener('click', () => fileInput.click());
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('border-brand-500', 'bg-brand-50/20');
+        });
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('border-brand-500', 'bg-brand-50/20');
+        });
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('border-brand-500', 'bg-brand-50/20');
+            const files = e.dataTransfer.files;
+            if (files.length) handleFile(files[0]);
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length) handleFile(e.target.files[0]);
+        });
+
+        // Main parser routing
+        function handleFile(file) {
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('loadingIndicator').classList.remove('hidden');
+
+            const reader = new FileReader();
+            
+            // Verifica tipo de arquivo
+            if (file.name.endsWith('.csv')) {
+                reader.onload = function(e) {
+                    const text = e.target.result;
+                    processCSV(text, file.name);
+                };
+                reader.readAsText(file, 'UTF-8');
+            } else {
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+                    processDataset(json, file.name);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        // CSV Simple parser
+        function processCSV(text, filename) {
+            // Split do arquivo por quebras de linha
+            const lines = text.split(/\r?\n/);
+            if (lines.length < 2) return;
+            
+            // Detecta separador (vírgula ou ponto-e-vírgula)
+            const firstLine = lines[0];
+            const separator = firstLine.includes(';') ? ';' : ',';
+            
+            const headers = firstLine.split(separator).map(h => h.trim().replace(/^["']|["']$/g, ""));
+            const json = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                const columns = lines[i].split(separator);
+                const row = {};
+                headers.forEach((header, index) => {
+                    let val = columns[index] !== undefined ? columns[index].trim() : "";
+                    val = val.replace(/^["']|["']$/g, ""); // Remove aspas
+                    row[header] = val;
+                });
+                json.push(row);
+            }
+            processDataset(json, filename);
+        }
+
+        // Core AI Engine: schema definition & modeling
+        function processDataset(data, filename) {
+            if (!data || data.length === 0) {
+                alert("Dados inválidos ou vazios encontrados.");
+                location.reload();
+                return;
+            }
+
+            rawData = data;
+            filteredData = [...data];
+            activeFilters = {};
+            
+            // Detecção inteligente de schema das colunas
+            schema = { numeric: [], dates: [], categories: [] };
+            const sample = data[0];
+            const keys = Object.keys(sample);
+
+            keys.forEach(key => {
+                let numericCount = 0;
+                let dateCount = 0;
+                let textCount = 0;
+                const checkLimit = Math.min(data.length, 50);
+
+                for (let i = 0; i < checkLimit; i++) {
+                    const val = String(data[i][key]).trim();
+                    if (!val) continue;
+
+                    // Test Numeric
+                    if (!isNaN(val.replace(',', '.')) && val !== "") {
+                        numericCount++;
+                    }
+                    // Test Date format
+                    if (isValidDate(val)) {
+                        dateCount++;
+                    }
+                }
+
+                if (numericCount / checkLimit > 0.6) {
+                    schema.numeric.push(key);
+                } else if (dateCount / checkLimit > 0.6) {
+                    schema.dates.push(key);
+                } else {
+                    schema.categories.push(key);
+                }
+            });
+
+            // Normalização dos campos numéricos para float puro
+            rawData.forEach(row => {
+                schema.numeric.forEach(key => {
+                    if (row[key]) {
+                        let parsedValue = String(row[key]).replace(/\s/g, '').replace(',', '.');
+                        row[key] = parseFloat(parsedValue) || 0;
+                    } else {
+                        row[key] = 0;
+                    }
+                });
+            });
+
+            // Configuração do Status
+            document.getElementById('fileStatusBadge').innerHTML = `<span class="h-2 w-2 rounded-full bg-emerald-500"></span> Base Pronta`;
+            document.getElementById('fileStatusBadge').className = `flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium bg-emerald-500/10 text-emerald-500`;
+            document.getElementById('loadedFileName').innerHTML = `<i class="fa-solid fa-file-excel text-emerald-500"></i> ${filename}`;
+            document.getElementById('loadedFileMeta').innerText = `${rawData.length.toLocaleString('pt-BR')} registros e ${keys.length} dimensões mapeadas`;
+
+            // Construir filtros de UI baseados nas colunas categóricas
+            buildFiltersUI();
+
+            // Renderizar Aplicação
+            applyFilters();
+
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            document.getElementById('dashboardWorkspace').classList.remove('hidden');
+        }
+
+        // Helper check date
+        function isValidDate(str) {
+            const dateReg = /^\d{2,4}[-/.]\d{2}[-/.]\d{2,4}$/;
+            if (!dateReg.test(str)) return false;
+            const d = new Date(str);
+            return !isNaN(d.getTime());
+        }
+
+        // Construir os componentes de Filtro
+        function buildFiltersUI() {
+            const container = document.getElementById('dynamicFiltersContainer');
+            container.innerHTML = '';
+            
+            // Seleciona até as 3 principais colunas categóricas para evitar bagunça visual
+            const filterColumns = schema.categories.slice(0, 3);
+
+            filterColumns.forEach(col => {
+                // Get unique values (limita a 50 opções para não quebrar a UI)
+                const uniqueValues = [...new Set(rawData.map(item => String(item[col] || 'Nulo')))].slice(0, 50);
+                
+                const filterBox = document.createElement('div');
+                filterBox.className = "flex flex-col";
+                filterBox.innerHTML = `
+                    <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">${col}</label>
+                    <select onchange="setFilter('${col}', this.value)" class="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 text-sm focus:outline-none focus:border-brand-500 transition-all">
+                        <option value="">Todos</option>
+                        ${uniqueValues.map(v => `<option value="${v}">${v}</option>`).join('')}
+                    </select>
+                `;
+                container.appendChild(filterBox);
+            });
+        }
+
+        // Set value on state filters
+        function setFilter(column, value) {
+            if (value === "") {
+                delete activeFilters[column];
+            } else {
+                activeFilters[column] = value;
+            }
+            applyFilters();
+        }
+
+        // Global search dynamic handler
+        document.getElementById('globalSearch').addEventListener('input', (e) => {
+            applyFilters();
+        });
+
+        // Aplicação de filtros + busca rápida
+        function applyFilters() {
+            const searchVal = document.getElementById('globalSearch').value.toLowerCase();
+
+            filteredData = rawData.filter(row => {
+                // Filtros categóricos
+                for (let key in activeFilters) {
+                    if (String(row[key]) !== activeFilters[key]) {
+                        return false;
+                    }
+                }
+                // Busca global text-based
+                if (searchVal) {
+                    const rowMatch = Object.values(row).some(val => 
+                        String(val).toLowerCase().includes(searchVal)
+                    );
+                    if (!rowMatch) return false;
+                }
+                return true;
+            });
+
+            pagination.currentPage = 1;
+            recalculateDashboard();
+        }
+
+        function clearAllFilters() {
+            activeFilters = {};
+            document.getElementById('globalSearch').value = '';
+            const selects = document.querySelectorAll('#dynamicFiltersContainer select');
+            selects.forEach(select => select.value = "");
+            applyFilters();
+        }
+
+        // Recalcular KPIs, Insights, Gráficos e Tabelas baseados na seleção ativa
+        function recalculateDashboard() {
+            renderKPIs();
+            renderCharts();
+            renderTable();
+            generateAutoInsights();
+        }
+
+        // Renderização Dinâmica dos KPIs Baseado no Schema
+        function renderKPIs() {
+            const grid = document.getElementById('kpiGrid');
+            grid.innerHTML = '';
+
+            // Adiciona KPI estático de volumetria total de linhas
+            createKPICard('Registros Filtrados', filteredData.length.toLocaleString('pt-BR'), 'fa-database', 'text-brand-500 bg-brand-50 dark:bg-brand-950/40', 'Volumetria total sob filtro');
+
+            // Mapeia até 3 métricas numéricas detectadas para KPIs quantitativos
+            const metrics = schema.numeric.slice(0, 3);
+            metrics.forEach((metric, index) => {
+                const total = filteredData.reduce((sum, r) => sum + (r[metric] || 0), 0);
+                const avg = filteredData.length > 0 ? (total / filteredData.length) : 0;
+                
+                // Formatação condicional
+                let formattedVal = total.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+                let subtext = `Média de ${avg.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} por registro`;
+
+                let icon = 'fa-chart-line';
+                let style = 'text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40';
+                if (index === 1) {
+                    icon = 'fa-scale-balanced';
+                    style = 'text-indigo-500 bg-indigo-50 dark:bg-indigo-950/40';
+                } else if (index === 2) {
+                    icon = 'fa-gem';
+                    style = 'text-amber-500 bg-amber-50 dark:bg-amber-950/40';
+                }
+
+                createKPICard(`Total: ${metric}`, formattedVal, icon, style, subtext);
+            });
+        }
+
+        function createKPICard(title, value, icon, colorClasses, subtext) {
+            const grid = document.getElementById('kpiGrid');
+            const card = document.createElement('div');
+            card.className = "bg-white dark:bg-slate-900 rounded-2xl p-5 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between";
+            card.innerHTML = `
+                <div class="space-y-1">
+                    <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider block">${title}</span>
+                    <span class="text-2xl font-bold tracking-tight">${value}</span>
+                    <span class="text-[11px] text-slate-400 block">${subtext}</span>
+                </div>
+                <div class="p-3.5 rounded-xl ${colorClasses}">
+                    <i class="fa-solid ${icon} text-lg"></i>
+                </div>
+            `;
+            grid.appendChild(card);
+        }
+
+        // Alterar tipo do gráfico de tendência
+        function changePrimaryChartType(type) {
+            primaryChartType = type;
+            renderCharts();
+        }
+
+        // Renderizador de Gráficos (Baseado em Chart.js)
+        function renderCharts() {
+            const isDark = htmlElement.classList.contains('dark');
+            const gridColor = isDark ? '#1e293b' : '#f1f5f9';
+            const labelColor = isDark ? '#94a3b8' : '#64748b';
+
+            // Destrói gráficos se já existirem
+            if (activePrimaryChart) activePrimaryChart.destroy();
+            if (activeSecondaryChart) activeSecondaryChart.destroy();
+
+            // Determinar chaves
+            const temporalCol = schema.dates[0] || null;
+            const categoryCol = schema.categories[0] || null;
+            const metricCol = schema.numeric[0] || null;
+
+            // 1. Configuração do Gráfico Temporal / Distribuição (Esquerdo)
+            if (temporalCol && metricCol) {
+                document.getElementById('chartPrimaryTitle').innerText = `Evolução de ${metricCol} por ${temporalCol}`;
+                
+                // Agrupamento de dados no tempo
+                const grouped = {};
+                filteredData.forEach(row => {
+                    const dateVal = String(row[temporalCol]).slice(0, 10); // Agrupa por YYYY-MM-DD
+                    grouped[dateVal] = (grouped[dateVal] || 0) + (row[metricCol] || 0);
+                });
+
+                // Ordenar datas
+                const sortedKeys = Object.keys(grouped).sort();
+                const chartData = sortedKeys.map(k => grouped[k]);
+
+                const ctx1 = document.getElementById('primaryChart').getContext('2d');
+                activePrimaryChart = new Chart(ctx1, {
+                    type: primaryChartType,
+                    data: {
+                        labels: sortedKeys,
+                        datasets: [{
+                            label: metricCol,
+                            data: chartData,
+                            borderColor: '#0284c7',
+                            backgroundColor: primaryChartType === 'line' ? 'rgba(2, 132, 199, 0.1)' : '#0284c7',
+                            fill: true,
+                            tension: 0.3,
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { color: gridColor }, ticks: { color: labelColor } },
+                            y: { grid: { color: gridColor }, ticks: { color: labelColor } }
+                        }
+                    }
+                });
+            } else if (metricCol) {
+                // Alternativo caso não haja datas: Gráfico de Barras de Distribuição Simples
+                document.getElementById('chartPrimaryTitle').innerText = `Volume Total Distribuído por Amostragem`;
+                const points = filteredData.slice(0, 30).map(r => r[metricCol]);
+                const labels = filteredData.slice(0, 30).map((_, i) => `Reg. ${i+1}`);
+
+                const ctx1 = document.getElementById('primaryChart').getContext('2d');
+                activePrimaryChart = new Chart(ctx1, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: points,
+                            backgroundColor: '#0284c7',
+                            borderRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            x: { grid: { color: gridColor }, ticks: { color: labelColor } },
+                            y: { grid: { color: gridColor }, ticks: { color: labelColor } }
+                        }
+                    }
+                });
+            }
+
+            // 2. Configuração do Gráfico de Categorias / Pizza (Direito)
+            if (categoryCol && metricCol) {
+                document.getElementById('chartSecondaryTitle').innerText = `Ranking de ${metricCol} por ${categoryCol}`;
+                
+                const catGroup = {};
+                filteredData.forEach(row => {
+                    const cat = String(row[categoryCol] || 'Outros');
+                    catGroup[cat] = (catGroup[cat] || 0) + (row[metricCol] || 0);
+                });
+
+                // Ordena e pega as top 5
+                const sortedCats = Object.keys(catGroup).sort((a,b) => catGroup[b] - catGroup[a]).slice(0, 5);
+                const values = sortedCats.map(c => catGroup[c]);
+
+                const ctx2 = document.getElementById('secondaryChart').getContext('2d');
+                activeSecondaryChart = new Chart(ctx2, {
+                    type: 'doughnut',
+                    data: {
+                        labels: sortedCats,
+                        datasets: [{
+                            data: values,
+                            backgroundColor: [
+                                '#0284c7',
+                                '#10b981',
+                                '#f59e0b',
+                                '#8b5cf6',
+                                '#ef4444'
+                            ],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: labelColor, boxWidth: 12 }
+                            }
+                        },
+                        cutout: '70%'
+                    }
+                });
+            }
+        }
+
+        // Geração de insights automáticos baseados nos dados filtrados
+        function generateAutoInsights() {
+            const box = document.getElementById('insightContent');
+            box.innerHTML = '';
+
+            const metric = schema.numeric[0] || null;
+            const category = schema.categories[0] || null;
+
+            if (!metric || filteredData.length === 0) {
+                box.innerHTML = `<div>Insira um arquivo com colunas numéricas para habilitar o mecanismo de insights de negócios avançados.</div>`;
+                return;
+            }
+
+            const values = filteredData.map(r => r[metric]);
+            const total = values.reduce((sum, v) => sum + v, 0);
+            const maxVal = Math.max(...values);
+            const avgVal = total / values.length;
+
+            // Busca de comportamento dos dados
+            let insightsHTML = '';
+
+            // Insight de Média e Volumetria
+            insightsHTML += `
+                <div class="flex items-start gap-2">
+                    <span class="text-brand-400 mt-1"><i class="fa-solid fa-check-double text-xs"></i></span>
+                    <p>O indicador principal <strong>${metric}</strong> obteve um valor acumulado histórico de <strong>${total.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</strong> sobre a amostragem atual, com performance média de <strong>${avgVal.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</strong> por unidade operacional.</p>
+                </div>
+            `;
+
+            // Insight de outlier (desvio extremo)
+            const outlierLimit = avgVal * 2.5;
+            const anomalies = filteredData.filter(r => r[metric] > outlierLimit);
+            if (anomalies.length > 0) {
+                insightsHTML += `
+                    <div class="flex items-start gap-2">
+                        <span class="text-amber-400 mt-1"><i class="fa-solid fa-triangle-exclamation text-xs"></i></span>
+                        <p><strong>Atenção de Escopo:</strong> Identificamos <strong>${anomalies.length} outliers operacionais</strong> que superam em 2.5x a média padrão, exigindo atenção ou análise de integridade nas bases.</p>
+                    </div>
+                `;
+            }
+
+            // Insight de liderança de categoria
+            if (category) {
+                const grouped = {};
+                filteredData.forEach(row => {
+                    const cat = String(row[category] || 'Nulo');
+                    grouped[cat] = (grouped[cat] || 0) + (row[metric] || 0);
+                });
+                const leader = Object.keys(grouped).reduce((a, b) => grouped[a] > grouped[b] ? a : b);
+                const leaderShare = ((grouped[leader] / total) * 100).toFixed(1);
+
+                insightsHTML += `
+                    <div class="flex items-start gap-2">
+                        <span class="text-emerald-400 mt-1"><i class="fa-solid fa-chart-line-up text-xs"></i></span>
+                        <p>A categoria <strong>${leader}</strong> lidera o ranking de representatividade de forma majoritária, concentrando um share de <strong>${leaderShare}%</strong> sobre todo o total medido.</p>
+                    </div>
+                `;
+            }
+
+            box.innerHTML = insightsHTML;
+        }
+
+        // Renderização e Paginação da Tabela Dinâmica
+        function renderTable() {
+            const headerRow = document.getElementById('tableHeaderRow');
+            const tbody = document.getElementById('tableBody');
+            
+            headerRow.innerHTML = '';
+            tbody.innerHTML = '';
+
+            if (filteredData.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="100%" class="px-6 py-12 text-center text-slate-400">Nenhum dado encontrado com os filtros aplicados.</td></tr>`;
+                return;
+            }
+
+            // Pegar todas as chaves (colunas)
+            const columns = Object.keys(filteredData[0]);
+
+            // Montar Header com ícones
+            columns.forEach(col => {
+                let iconClass = 'fa-font';
+                if (schema.numeric.includes(col)) iconClass = 'fa-hashtag';
+                if (schema.dates.includes(col)) iconClass = 'fa-calendar-days';
+
+                const th = document.createElement('th');
+                th.className = "px-6 py-4 text-xs font-semibold text-slate-500 uppercase tracking-wider cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors";
+                th.innerHTML = `
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid ${iconClass} text-[10px] text-slate-400"></i>
+                        ${col}
+                    </div>
+                `;
+                headerRow.appendChild(th);
+            });
+
+            // Gerenciar paginação de dados
+            const startIndex = (pagination.currentPage - 1) * pagination.pageSize;
+            const endIndex = startIndex + pagination.pageSize;
+            const pageData = filteredData.slice(startIndex, endIndex);
+
+            // Atualiza Metadados de Paginação
+            document.getElementById('tablePaginationMeta').innerText = `Mostrando ${Math.min(startIndex + 1, filteredData.length)} até ${Math.min(endIndex, filteredData.length)} de ${filteredData.length.toLocaleString('pt-BR')} registros`;
+
+            // Renderizar as linhas reais da página atual
+            pageData.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50/50 dark:hover:bg-slate-900/50 transition-all border-b border-slate-100 dark:border-slate-800/60";
+                
+                columns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.className = "px-6 py-3.5 text-xs text-slate-600 dark:text-slate-300 font-medium";
+                    
+                    // Formatação amigável se for numérico
+                    let cellVal = row[col];
+                    if (schema.numeric.includes(col) && typeof cellVal === 'number') {
+                        cellVal = cellVal.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+                    }
+                    
+                    td.innerText = cellVal !== undefined && cellVal !== null ? cellVal : '';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            buildPaginationControls();
+        }
+
+        // Construir os botões de páginas individuais
+        function buildPaginationControls() {
+            const pageSelector = document.getElementById('pageSelector');
+            pageSelector.innerHTML = '';
+
+            const totalPages = Math.ceil(filteredData.length / pagination.pageSize);
+            const maxVisible = 3;
+
+            document.getElementById('btnPrevPage').disabled = pagination.currentPage === 1;
+            document.getElementById('btnNextPage').disabled = pagination.currentPage === totalPages || totalPages === 0;
+
+            let startPage = Math.max(1, pagination.currentPage - 1);
+            let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+
+            if (endPage - startPage < maxVisible - 1) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                const btn = document.createElement('button');
+                btn.className = `w-8 h-8 rounded-lg text-xs font-bold transition-all ${pagination.currentPage === i ? 'bg-brand-500 text-white shadow-sm' : 'border border-slate-200 dark:border-slate-800 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-850'}`;
+                btn.innerText = i;
+                btn.onclick = () => {
+                    pagination.currentPage = i;
+                    renderTable();
+                };
+                pageSelector.appendChild(btn);
+            }
+        }
+
+        function prevPage() {
+            if (pagination.currentPage > 1) {
+                pagination.currentPage--;
+                renderTable();
+            }
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(filteredData.length / pagination.pageSize);
+            if (pagination.currentPage < totalPages) {
+                pagination.currentPage++;
+                renderTable();
+            }
+        }
+
+        // Exportadores Avançados de Dados
+
+        // 1. Exportar XLSX utilizando SheetJS
+        function exportToExcel() {
+            if (filteredData.length === 0) return;
+            const worksheet = XLSX.utils.json_to_sheet(filteredData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, "AthenaBI_Export");
+            XLSX.writeFile(workbook, `athena_bi_export_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        // 2. Exportar PDF utilizando html2pdf
+        function exportToPDF() {
+            const element = document.getElementById('dashboardWorkspace');
+            const opt = {
+                margin:       10,
+                filename:     `athena_report_${new Date().toISOString().slice(0,10)}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            };
+            html2pdf().set(opt).from(element).save();
+        }
+    </script>
+</body>
+</html>
