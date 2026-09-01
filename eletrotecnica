@@ -38,12 +38,12 @@
     <script>
         // Dados embutidos da sua planilha
         const embeddedData = [
-            {"Estrelas":90,"Equipe":"NitroTech"},
-            {"Estrelas":110,"Equipe":"MecaTec"},
-            {"Estrelas":110,"Equipe":"Infinity"},
-            {"Estrelas":90,"Equipe":"StarTronic"},
-            {"Estrelas":110,"Equipe":"MecaTurbo"},
-            {"Estrelas":140,"Equipe":"IronForce"},
+            {"Estrelas":00,"Equipe":"Grupo 01"},
+            {"Estrelas":00,"Equipe":"Grupo 02"},
+            {"Estrelas":00,"Equipe":"Grupo 03"},
+            {"Estrelas":00,"Equipe":"Grupo 04"},
+            {"Estrelas":00,"Equipe":"Grupo 05"},
+            {"Estrelas":00,"Equipe":"Grupo 06"},
         ];
 
         function initDashboard() {
